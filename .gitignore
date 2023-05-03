@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# MRR  2023-05-02
+.DS_Store
+# Not sure about these, but ignoring anyway.
+*.xcworkspacedata
+*.xcuserstate
