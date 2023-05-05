@@ -36,3 +36,6 @@
 # Not sure about these, but ignoring anyway.
 *.xcworkspacedata
 *.xcuserstate
+*.csv
+*.log
+
