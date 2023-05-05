@@ -4,14 +4,18 @@
 //
 // Created by Mark Riordan on 2023-05-02.
 //
+// On Marks-iMac-Pro the release build location is:
+// /Users/mrr/Library/Developer/Xcode/DerivedData/sortbench-ctcrgrohjviqkchcipkjtnucyeou/Build/Products/Release/sortbench
 
 #include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
+#include <string>
+#include <cmath>
 
-//void clock_get_system_nanotime(uint32_t *secs, uint32_t *nanosecs);
+using namespace std;
 
 struct DataRecord {
     char data[72];
@@ -24,6 +28,129 @@ typedef uint64_t sb_timer_t;
 bool elementGreaterThan(ArrayElementType &first, ArrayElementType &second)
 {
     return (strncmp(first->data, second->data, 6) > 0);
+}
+
+FILE *fileLog = NULL;
+void openLogFile()
+{
+    fileLog = fopen("sortbench.csv", "a");
+}
+
+void closeLogFile()
+{
+    fclose(fileLog);
+}
+
+void writeLogRec(const char *sortName, int64_t nRecs, int64_t seed, int64_t elapsedNs, bool bSortedOK)
+{
+    double elapsedSecs = 0.000000001 * elapsedNs;
+    double recsPerSec = nRecs / elapsedSecs;
+    fprintf(fileLog,
+            "%s,%lld,%lld,%lld,%f,%s\n",sortName, nRecs, seed, elapsedNs, recsPerSec,
+            bSortedOK ? "true":"false");
+}
+
+enum TypGap {GAP_CIURA_22, CAP_CIURA_225, CAP_CIURA_225_ODD, GAP_CIURA_SQRT5, GAP_KNUTH73, GAP_MAX};
+const int NUM_GAPS = 32;
+int64_t allGaps[GAP_MAX][NUM_GAPS] = {
+    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
+    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
+    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
+    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
+    {0}
+};
+
+const char *nameOfGapType(TypGap gapType)
+{
+    const char *name = "Unknown";
+    struct TypGapToName {
+        TypGap gtn_type;
+        const char *gtn_name;
+    } aryTypeToName[] = {
+        {GAP_CIURA_22, "Ciura22"},
+        {CAP_CIURA_225, "Ciura225"},
+        {CAP_CIURA_225_ODD, "Ciura225Odd"},
+        {GAP_CIURA_SQRT5, "CiuraSqrt5"},
+        {GAP_KNUTH73, "Knuth73"},
+        {GAP_MAX, NULL}
+    };
+    for(int j=0; aryTypeToName[j].gtn_name!=NULL; j++) {
+        if(gapType == aryTypeToName[j].gtn_type) {
+            name = aryTypeToName[j].gtn_name;
+            break;
+        }
+    }
+    return name;
+}
+
+void buildGaps()
+{
+    int j, gap;
+    int64_t *gaps;
+    
+    // Build Ciura gaps, starting with the hard-coded results from Ciura, and
+    // extending them by multiplying the previous gap by 2.2 (11/5).
+    gaps = allGaps[GAP_CIURA_22];
+    for(j=0; gaps[j]>=0; j++) {
+        if(gaps[j]==0) {
+            gaps[j] = 11*gaps[j-1] / 5;
+        }
+    }
+    
+    gaps = allGaps[CAP_CIURA_225];
+    for(j=0; gaps[j]>=0; j++) {
+        if(gaps[j]==0) {
+            gaps[j] = (uint64_t)(2.25*gaps[j-1]);
+        }
+    }
+    
+    gaps = allGaps[CAP_CIURA_225_ODD];
+    for(j=0; gaps[j]>=0; j++) {
+        if(gaps[j]==0) {
+            gaps[j] = 1 | (uint64_t)(2.25*gaps[j-1]);
+        }
+    }
+    
+    gaps = allGaps[GAP_CIURA_SQRT5];
+    double sqrt5 = sqrt(5.0);
+    bool bDoFive = true;
+    for(j=0; gaps[j]>=0; j++) {
+        if(gaps[j]==0) {
+            if(bDoFive) {
+                gaps[j] = 5*gaps[j-2];
+            } else {
+                gaps[j] = gaps[j-1] * sqrt5;
+            }
+        }
+    }
+    
+    gaps = allGaps[GAP_KNUTH73];
+    for(j=0; j<NUM_GAPS-1; j++) {
+        gap = pow(3, j+1);
+        gap--;
+        gap /= 2;
+        gaps[j] = gap;
+    }
+    gaps[NUM_GAPS-1] = -1;
+}
+
+void printOneGap(TypGap gapType)
+{
+    int64_t *gaps = allGaps[gapType];gaps = allGaps[gapType];
+    printf("%s: ", nameOfGapType(gapType));
+    for(int j=0; gaps[j]>=0; j++) {
+        printf(" %lld", gaps[j]);
+    }
+    printf("\n");
+}
+
+void printGaps()
+{
+    int iGapType;
+    for(TypGap gapType=GAP_CIURA_22; gapType<GAP_MAX;
+        (iGapType = (int) gapType, iGapType++, gapType = (TypGap) iGapType)) {
+        printOneGap(gapType);
+    }
 }
 
 sb_timer_t getCurrentNanoseconds()
@@ -55,11 +182,11 @@ void setRandomSeed(uint64_t seed)
     randoms[3] = (seed << 9) ^ 0x59031;
 }
 
-ArrayElementType * createArray(int nElements, DataRecord *&arrayData)
+ArrayElementType * createArray(int64_t nElements, DataRecord *&arrayData)
 {
     arrayData = new DataRecord[nElements];
     ArrayElementType *arrayPointers = new ArrayElementType[nElements];
-    for(int j=0; j<nElements; j++) {
+    for(int64_t j=0; j<nElements; j++) {
         DataRecord *pRec = &arrayData[j];
         arrayPointers[j] = pRec;
         int ichar;
@@ -89,10 +216,10 @@ ArrayElementType * createArray(int nElements, DataRecord *&arrayData)
 //          gaps is an array of ShellSort gaps, starting with 1.
 //              Note that the gaps are increasing, not decreasing.
 // Exit:    a   has been sorted in increasing order.
-void shellSort(ArrayElementType a[], int n, int gaps[])
+void shellSort(ArrayElementType a[], int64_t n, int64_t gaps[])
 {
     ArrayElementType temp;
-    int gap, igap, i, j;
+    int64_t gap, igap, i, j;
     
     if(n <= 1) return;
     
@@ -117,7 +244,7 @@ void shellSort(ArrayElementType a[], int n, int gaps[])
 }
 
 // Returns true if the array elements are in proper order.
-bool checkArrayOrder(ArrayElementType * pArray, int n)
+bool checkArrayOrder(ArrayElementType * pArray, int64_t n)
 {
     bool bOK=true;
     if(n>1) {
@@ -131,9 +258,7 @@ bool checkArrayOrder(ArrayElementType * pArray, int n)
     return bOK;
 }
 
-
-
-bool doOneSort(int n, int gaps[], sb_timer_t &elapsedNs)
+bool doOneSort(int64_t n, int64_t gaps[], sb_timer_t &elapsedNs)
 {
     bool bOK=true;
     DataRecord *arrayData;
@@ -149,33 +274,33 @@ bool doOneSort(int n, int gaps[], sb_timer_t &elapsedNs)
 
 void doSorts()
 {
-    int gaps[] = {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1};
-    int j;
-    for(j=0; gaps[j]>=0; j++) {
-        if(gaps[j]==0) {
-            gaps[j] = 11*gaps[j-1] / 5;
-        }
-    }
-    printf("gaps: ");
-    for(j=0; gaps[j]>=0; j++) {
-        printf(" %d", gaps[j]);
-    }
-    printf("\n");
     sb_timer_t elapsedNs;
-    for(int n=10; n<=10000000; n*=10) {
-        for(int loop=0; loop<5; loop++) {
-            uint64_t seed = 301 + loop;
-            setRandomSeed(seed);
-            bool bOK = doOneSort(n, gaps, elapsedNs);
-            double elapsedSecs = 0.000000001 * elapsedNs;
-            double recsPerSec = n / elapsedSecs;
-            printf("sort size %d seed %lld took %f sec for %.1f recs/sec; ret %s\n",
-                   n, seed, elapsedSecs, recsPerSec, bOK ? "true":"false");
+    TypGap gapType;
+    int iGapType;
+    for(gapType=GAP_CIURA_22; gapType<GAP_MAX; (iGapType = (int) gapType, iGapType++, gapType = (TypGap) iGapType)) {
+        printf("Using ShellSort with gap sequence %s\n", nameOfGapType(gapType));
+        string sortName = "ShellSort";
+        sortName += nameOfGapType(gapType);
+        int64_t *gaps = allGaps[gapType];
+        for(int64_t nOrig=10; nOrig<=1000000; nOrig*=10) {
+            for(int64_t add=0; add<2; add++) {
+                int64_t n = nOrig + add;
+                for(int loop=0; loop<10; loop++) {
+                    uint64_t seed = 301 + loop;
+                    setRandomSeed(seed);
+                    bool bOK = doOneSort(n, gaps, elapsedNs);
+                    writeLogRec(sortName.c_str(), n, seed, elapsedNs, bOK);
+                    double elapsedSecs = 0.000000001 * elapsedNs;
+                    double recsPerSec = n / elapsedSecs;
+                    printf("%s size %lld seed %lld took %f sec for %.1f recs/sec; ret %s\n",
+                           nameOfGapType(gapType), n, seed, elapsedSecs, recsPerSec, bOK ? "true":"false");
+                }
+            }
         }
     }
 }
 
-void printArray(ArrayElementType * pArray, int n)
+void printArray(ArrayElementType * pArray, int64_t n)
 {
     for(int irec=0; irec<n; irec++) {
         printf("%3d: ", irec);
@@ -250,12 +375,12 @@ void testGenArray()
 
 void testGenAndShellSort()
 {
-    int n = 12;
+    int64_t n = 12;
     DataRecord *arrayData;
     ArrayElementType * pArray = createArray(n, arrayData);
     printf("Generated array:\n");
     printArray(pArray, n);
-    int gaps[] = {1, 4, 10, 23, 57, 132, 301, 701, 0};
+    int64_t gaps[] = {1, 4, 10, 23, 57, 132, 301, 701, -1};
     shellSort(pArray, n, gaps);
     printf("Sorted array:\n");
     printArray(pArray, n);
@@ -268,13 +393,23 @@ void testGenAndShellSort()
     delete []pArray;
 }
 
+void testGaps()
+{
+    printGaps();
+}
+
 int main(int argc, const char * argv[]) {
+    openLogFile();
+    buildGaps();
+
     //testTimer();
     //testRNG();
     //testOrder();
     //testGenArray();
     //testGenAndShellSort();
+    testGaps();
     
     doSorts();
+    closeLogFile();
     return 0;
 }
