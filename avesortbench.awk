@@ -24,6 +24,11 @@ BEGIN {
     sumRecsPerSec = 0
 }
 
+# Compute the average, and average deviation, for similar benchmark runs.
+# Entry:    sumRecsPerSec   is the sum of the relevant records
+#           nThisType       is the number of records
+#           aryRecsPerSec   is a 1-based array of recs/sec for the
+#                           relevant benchmark runs.
 function procRecs() {
     # compute average recs/sec for the type of record we just encountered
     aveRecsPerSec = sumRecsPerSec / nThisType
@@ -40,20 +45,20 @@ function procRecs() {
 }
 
 {
-    #print "Read: " $0
     name = $1
     nRecs = $2
     # Collapse all records with similar nrecs to the same number.
     # The benchmark program can use similar but slightly different record
     # counts to prevent end cases where a particular record count
-    # triggers unusual behavior.
+    # triggers unusual behavior; we'll treat these as having the same count.
     if(length(nRecs)>2) {
         # Also change to a number, as opposed to a string.
         nRecs = 0 + (substr(nRecs, 1, length(nRecs)-1) "0")
     }
     recsPerSec = $5
-    
-    #print "name=" name " prevName=" prevName " nRecs=" nRecs " prevNRecs=" prevNRecs
+
+    # Detect whether the current record starts a new batch of benchmark runs.
+    # If so, do calculations on the just-ended batch of runs.
     if(name != prevName || nRecs != prevNRecs) {
         if(prevName != "") {
             procRecs()
@@ -63,6 +68,7 @@ function procRecs() {
     }
     
     nThisType++
+    
     # This 1-based array contains the recs/sec for all runs with the same
     # algorithm and # of records. It's for computing average deviation.
     aryRecsPerSec[nThisType] = recsPerSec
@@ -73,5 +79,6 @@ function procRecs() {
 }
 
 END {
+    # Compute results for the last batch of records.
     procRecs()
 }
