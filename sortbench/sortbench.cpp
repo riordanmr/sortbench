@@ -25,15 +25,111 @@ typedef DataRecord *ArrayElementType;
 
 typedef uint64_t sb_timer_t;
 
+struct TypSettings {
+    int64_t maxRecs = 10000000;
+    int64_t loopCt = 10;
+    int64_t seed = 301;
+    string  outputFile = "sortbench.csv";
+    bool    bTest = false;
+} Settings;
+
+void usage()
+{
+    const char *msg[] = {
+        "sortbench: Program to benchmark sorting algorithms.",
+        "Generates arrays of random and sorts them.",
+        "Usage: sortbench {-test | [-maxrecs:maxrecs] [-loopct:loopct]",
+        "  [-seed:seed] [-outfile:outfile] }",
+        "Where:",
+        "-test      causes the program to run various self-tests,",
+        "           print the results of those tests, and exit.",
+        "maxrecs    is the maximum number of array entries to use.",
+        "           Various array sizes up to and including this size",
+        "           will be benchmarked. Default: 10000000.",
+        "loopct     is the number of times each benchmark should be run,",
+        "           typically with different data.  Default: 10.",
+        "seed       is a signed 32-bit number that will be used as a seed",
+        "           for a random number generator.  This allows results to",
+        "           be reproducible between runs.  Default: 301.",
+        "outfile    is the name of the output CSV file to create; this",
+        "           contains the results of each run of the benchmark.",
+        "           Default: sortbench.csv",
+        "MRR  2023-05-03",
+        NULL
+    };
+    
+    for(int j=0; NULL != msg[j]; j++) {
+        puts(msg[j]);
+    }
+}
+
+bool parseArg(const char *arg, string &name, string &val)
+{
+    bool bOK=true;
+    name = "";
+    val = "";
+    const char *pch = arg;
+    bool bHasName = false;
+    if('-' == *pch) {
+        pch++;
+        if('\0' == *pch) {
+            bOK = false;
+        } else {
+            bHasName = true;
+            const char *pcolon = strchr(pch, ':');
+            if(NULL != pcolon) {
+                name = string(pch, pcolon-pch);
+                val = string(1+pcolon);
+            } else {
+                name = string(pch);
+            }
+        }
+    } else {
+        val = string(pch);
+    }
+    return bOK;
+}
+
+bool parseCmdLine(int argc, const char * argv[], TypSettings &settings)
+{
+    bool bOK=true;
+    for(int j=1; j<argc; j++) {
+        string name, val;
+        const char *parg;
+        parg = argv[j];
+        if(parseArg(parg, name, val)) {
+            if("test"==name) {
+                settings.bTest = true;
+            } else if("maxrecs"==name) {
+                settings.maxRecs = atol(val.c_str());
+            } else if("loopct"==name) {
+                settings.loopCt = atol((val.c_str()));
+            } else if("seed"==name) {
+                settings.seed = atol(val.c_str());
+            } else if("outfile"==name) {
+                settings.outputFile = val;
+            } else {
+                printf("Unrecognized argument: %s\n", name.c_str());
+                bOK = false;
+            }
+        } else {
+            printf("Invalid argument: %s\n", parg);
+            bOK = false;
+        }
+    }
+
+    return bOK;
+}
+
 bool elementGreaterThan(ArrayElementType &first, ArrayElementType &second)
 {
     return (strncmp(first->data, second->data, 6) > 0);
 }
 
 FILE *fileLog = NULL;
-void openLogFile()
+void openLogFile(const char *fileName)
 {
-    fileLog = fopen("sortbench.csv", "a");
+    fileLog = fopen(fileName, "a");
 }
 
 void closeLogFile()
@@ -97,6 +193,7 @@ void buildGaps()
         }
     }
     
+    // Minor variation: multiply previous gap by 2.25.
     gaps = allGaps[CAP_CIURA_225];
     for(j=0; gaps[j]>=0; j++) {
         if(gaps[j]==0) {
@@ -104,6 +201,8 @@ void buildGaps()
         }
     }
     
+    // Another variation: multiply previous gap by 2.25 and if it isn't odd,
+    // add 1 to make it odd.
     gaps = allGaps[CAP_CIURA_225_ODD];
     for(j=0; gaps[j]>=0; j++) {
         if(gaps[j]==0) {
@@ -111,6 +210,7 @@ void buildGaps()
         }
     }
     
+    // Extend the Ciura gaps by
     gaps = allGaps[GAP_CIURA_SQRT5];
     double sqrt5 = sqrt(5.0);
     bool bDoFive = true;
@@ -121,6 +221,7 @@ void buildGaps()
             } else {
                 gaps[j] = gaps[j-1] * sqrt5;
             }
+            bDoFive = !bDoFive;
         }
     }
     
@@ -179,7 +280,7 @@ void setRandomSeed(uint64_t seed)
     randoms[0] = seed;
     randoms[1] = (seed << 3) ^ 0x136;
     randoms[2] = seed + ((seed << 6) ^ 0x400);
-    randoms[3] = (seed << 9) ^ 0x59031;
+    randoms[3] = (seed << 9) ^ 0x59031c3;
 }
 
 ArrayElementType * createArray(int64_t nElements, DataRecord *&arrayData)
@@ -199,22 +300,12 @@ ArrayElementType * createArray(int64_t nElements, DataRecord *&arrayData)
     return arrayPointers;
 }
 
-// Delete the array of data that was created for sorting, plus the
-// array of pointers to data records.
-// Entry:   pArray  is the array of pointers to records.
-// Exit:    The data array, plus the array of pointers to records,
-//          have been deleted.
-//void deleteArray(ArrayElementType *pArray)
-//{
-//    delete pArray[0];
-//    delete pArray;
-//}
-
 // Sort an array using ShellSort.
 // Entry:   a   is an array of pointers to data records.
 //          n   is the number of elements in the array to sort.
 //          gaps is an array of ShellSort gaps, starting with 1.
 //              Note that the gaps are increasing, not decreasing.
+//              The sequence of gaps ends with a gap <= 0.
 // Exit:    a   has been sorted in increasing order.
 void shellSort(ArrayElementType a[], int64_t n, int64_t gaps[])
 {
@@ -272,7 +363,7 @@ bool doOneSort(int64_t n, int64_t gaps[], sb_timer_t &elapsedNs)
     return bOK;
 }
 
-void doSorts()
+void doSorts(TypSettings settings)
 {
     sb_timer_t elapsedNs;
     TypGap gapType;
@@ -282,11 +373,11 @@ void doSorts()
         string sortName = "ShellSort";
         sortName += nameOfGapType(gapType);
         int64_t *gaps = allGaps[gapType];
-        for(int64_t nOrig=10; nOrig<=1000000; nOrig*=10) {
+        for(int64_t nOrig=10; nOrig<=settings.maxRecs; nOrig*=10) {
             for(int64_t add=0; add<2; add++) {
                 int64_t n = nOrig + add;
-                for(int loop=0; loop<10; loop++) {
-                    uint64_t seed = 301 + loop;
+                for(int loop=0; loop<settings.loopCt; loop++) {
+                    uint64_t seed = settings.seed + loop;
                     setRandomSeed(seed);
                     bool bOK = doOneSort(n, gaps, elapsedNs);
                     writeLogRec(sortName.c_str(), n, seed, elapsedNs, bOK);
@@ -327,7 +418,8 @@ void testTimer()
 void testRNG()
 {
     setRandomSeed(762);
-    for(int j=0; j<888; j++) {
+    printf("Testing random character generator:\n");
+    for(int j=0; j<1000; j++) {
         putchar(getRandomChar());
     }
     putchar('\n');
@@ -376,6 +468,8 @@ void testGenArray()
 void testGenAndShellSort()
 {
     int64_t n = 12;
+    printf("Testing generation and sorting of small array:\n");
+    setRandomSeed(5555);
     DataRecord *arrayData;
     ArrayElementType * pArray = createArray(n, arrayData);
     printf("Generated array:\n");
@@ -395,21 +489,30 @@ void testGenAndShellSort()
 
 void testGaps()
 {
+    printf("Here are the calculated gap sequences:\n");
     printGaps();
 }
 
 int main(int argc, const char * argv[]) {
-    openLogFile();
-    buildGaps();
-
-    //testTimer();
-    //testRNG();
-    //testOrder();
-    //testGenArray();
-    //testGenAndShellSort();
-    testGaps();
-    
-    doSorts();
-    closeLogFile();
-    return 0;
+    int retcode = 0;
+    TypSettings settings;
+    if(!parseCmdLine(argc, argv, settings)) {
+        usage();
+        retcode = 1;
+    } else {
+        buildGaps();
+        if(settings.bTest) {
+            testTimer();
+            testRNG();
+            testOrder();
+            testGenArray();
+            testGenAndShellSort();
+            testGaps();
+        } else {
+            openLogFile(settings.outputFile.c_str());
+            doSorts(settings);
+            closeLogFile();
+        }
+    }
+    return retcode;
 }
