@@ -6,8 +6,8 @@
 # ShellSortCiura225Odd,1000001,301,842342466,1187166.788288,true
 #
 # Output records look like:
-# name of sort        ,nrecs  ,ave recs/ns,ave deviation,ratio ave dev
-# ShellSortCiura225Odd,1000000,1190501.6,555.0,0.04
+# name of sort        ,nrecs  ,ave recs/ns,nRuns,ave deviation,ratio ave dev
+# ShellSortCiura225Odd,1000000,40,1192690.9,13758.4,0.01154
 # which is a record containing the average for all runs with the same
 # algorithm and similar record count.
 #
@@ -41,7 +41,7 @@ function procRecs() {
     }
     aveDev = sumDevs / nThisType
     ratioAveDev = aveDev / aveRecsPerSec
-    print prevName "," prevNRecs "," sprintf("%.1f",aveRecsPerSec) "," sprintf("%.1f",aveDev) "," sprintf("%.5f", ratioAveDev)
+    print prevName "," prevNRecs "," nThisType "," sprintf("%.1f",aveRecsPerSec) "," sprintf("%.1f",aveDev) "," sprintf("%.5f", ratioAveDev)
 }
 
 {
