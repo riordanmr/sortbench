@@ -9,11 +9,13 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
 #include <string>
 #include <cmath>
+#include "rangen.h"
 
 using namespace std;
 
@@ -26,7 +28,7 @@ typedef DataRecord *ArrayElementType;
 typedef uint64_t sb_timer_t;
 
 struct TypSettings {
-    int64_t maxRecs = 10000000;
+    int64_t maxRecs = 1000000;
     int64_t loopCt = 10;
     int64_t seed = 301;
     string  outputFile = "sortbench.csv";
@@ -146,13 +148,17 @@ void writeLogRec(const char *sortName, int64_t nRecs, int64_t seed, int64_t elap
             bSortedOK ? "true":"false");
 }
 
-enum TypGap {GAP_CIURA_22, CAP_CIURA_225, CAP_CIURA_225_ODD, GAP_CIURA_SQRT5, GAP_KNUTH73, GAP_MAX};
-const int NUM_GAPS = 32;
+enum TypGap {GAP_CIURA_22, CAP_CIURA_225, CAP_CIURA_225_ODD, GAP_JDAW1, GAP_KNUTH73, GAP_MAX};
+const int NUM_GAPS = 36;
 int64_t allGaps[GAP_MAX][NUM_GAPS] = {
-    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
-    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
-    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
-    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
+    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
+    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
+    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
+    // See jdaw1's comment on https://stackoverflow.com/questions/2539545/fastest-gap-sequence-for-shell-sort:
+    {1, 3, 7, 16, 37, 83, 187, 419, 937, 2099, 4693, 10499, 23479, 52501, 117391, 262495, 586961, 1312481,
+        2934793, 6562397, 14673961, 32811973, 73369801, 164059859, 366848983, 820299269, 1834244921,
+        4101496331, 9171224603, 20507481647, 45856123009, 102537408229, 229280615033, 512687041133,
+        1146403075157, -1},
     {0}
 };
 
@@ -166,7 +172,7 @@ const char *nameOfGapType(TypGap gapType)
         {GAP_CIURA_22, "Ciura22"},
         {CAP_CIURA_225, "Ciura225"},
         {CAP_CIURA_225_ODD, "Ciura225Odd"},
-        {GAP_CIURA_SQRT5, "CiuraSqrt5"},
+        {GAP_JDAW1, "Jdaw1"},
         {GAP_KNUTH73, "Knuth73"},
         {GAP_MAX, NULL}
     };
@@ -211,19 +217,19 @@ void buildGaps()
     }
     
     // Extend the Ciura gaps by
-    gaps = allGaps[GAP_CIURA_SQRT5];
-    double sqrt5 = sqrt(5.0);
-    bool bDoFive = true;
-    for(j=0; gaps[j]>=0; j++) {
-        if(gaps[j]==0) {
-            if(bDoFive) {
-                gaps[j] = 5*gaps[j-2];
-            } else {
-                gaps[j] = gaps[j-1] * sqrt5;
-            }
-            bDoFive = !bDoFive;
-        }
-    }
+//    gaps = allGaps[GAP_CIURA_SQRT5];
+//    double sqrt5 = sqrt(5.0);
+//    bool bDoFive = true;
+//    for(j=0; gaps[j]>=0; j++) {
+//        if(gaps[j]==0) {
+//            if(bDoFive) {
+//                gaps[j] = 5*gaps[j-2];
+//            } else {
+//                gaps[j] = gaps[j-1] * sqrt5;
+//            }
+//            bDoFive = !bDoFive;
+//        }
+//    }
     
     gaps = allGaps[GAP_KNUTH73];
     for(j=0; j<NUM_GAPS-1; j++) {
@@ -261,26 +267,48 @@ sb_timer_t getCurrentNanoseconds()
     return nano;
 }
 
+//=====  Pseudo-random number generation  ==============================
+#define USING_MD5_PRNG 1
+
+#ifdef USING_MRR_PRNG
 static uint64_t randoms[4];
+#elif USING_MD5_PRNG
+static myRandomContext randomContext;
+#endif
 
 char getRandomChar()
 {
     static const char *possibleChars = "abcdefghijklmnopqrstuvwxyz012345";
-    uint64_t random = ((randoms[0] + randoms[2]) ^ 0x2d135) + (randoms[1]>>7);
-    randoms[0] = randoms[1];
+#ifdef USING_MRR_PRNG
+    uint64_t randres = (((randoms[0]>>3) + randoms[2]) ^ 0x2d135) + (randoms[1]>>7);
+    randoms[0] = 37493*randoms[1];
     randoms[1] = randoms[2];
     randoms[2] = randoms[3];
-    randoms[3] = random;
-    char result = possibleChars[(random>>5) & 0x1f];
+    randoms[3] = randres;
+    char result = possibleChars[(randres>>5) & 0x1f];
+#elif USING_MD5_PRNG
+    unsigned char randres = myNextRandomByte(&randomContext);
+    char result = possibleChars[randres & 0x1f];
+#elif USING_ARC4_PRNG
+    // I tried this higher-quality alternative as a reality check on my own PRNG.
+    // However, it's not suitable for published results because it can't be seeded
+    // to return the same results for different runs.  Also, it's surprisingly slow.
+    uint32_t randres = arc4random();
+    char result = possibleChars[randres & 0x1f];
+#endif
     return result;
 }
 
 void setRandomSeed(uint64_t seed)
 {
+#ifdef USING_MRR_PRNG
     randoms[0] = seed;
     randoms[1] = (seed << 3) ^ 0x136;
     randoms[2] = seed + ((seed << 6) ^ 0x400);
     randoms[3] = (seed << 9) ^ 0x59031c3;
+#elif USING_MD5_PRNG
+    mySetRandomSeed(&randomContext, seed);
+#endif
 }
 
 ArrayElementType * createArray(int64_t nElements, DataRecord *&arrayData)
@@ -417,8 +445,17 @@ void testTimer()
 
 void testRNG()
 {
+    printf("Testing ability to reset PRNG:\n");
+    for(int loop=0; loop<3; loop++) {
+        setRandomSeed(762);
+        printf("Loop %d: ", loop);
+        for(int j=0; j<71; j++) {
+            putchar(getRandomChar());
+        }
+        putchar('\n');
+    }
     setRandomSeed(762);
-    printf("Testing random character generator:\n");
+    printf("Now let the PRNG generator run longer:\n");
     for(int j=0; j<1000; j++) {
         putchar(getRandomChar());
     }
