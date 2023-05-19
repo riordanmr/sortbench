@@ -148,7 +148,8 @@ void writeLogRec(const char *sortName, int64_t nRecs, int64_t seed, int64_t elap
             bSortedOK ? "true":"false");
 }
 
-enum TypGap {GAP_CIURA_22, CAP_CIURA_225, CAP_CIURA_225_ODD, GAP_JDAW1, GAP_KNUTH73, GAP_MAX};
+enum TypGap {GAP_CIURA_22, CAP_CIURA_225, CAP_CIURA_225_ODD, GAP_JDAW1, GAP_KNUTH73, GAP_LEE21,
+    GAP_TOKUDA92, GAP_MAX};
 const int NUM_GAPS = 36;
 int64_t allGaps[GAP_MAX][NUM_GAPS] = {
     {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
@@ -159,6 +160,11 @@ int64_t allGaps[GAP_MAX][NUM_GAPS] = {
         2934793, 6562397, 14673961, 32811973, 73369801, 164059859, 366848983, 820299269, 1834244921,
         4101496331, 9171224603, 20507481647, 45856123009, 102537408229, 229280615033, 512687041133,
         1146403075157, -1},
+    // Knuth73
+    {0},
+    // Lee 21
+    {0},
+    // Tokuda92
     {0}
 };
 
@@ -174,6 +180,8 @@ const char *nameOfGapType(TypGap gapType)
         {CAP_CIURA_225_ODD, "Ciura225Odd"},
         {GAP_JDAW1, "Jdaw1"},
         {GAP_KNUTH73, "Knuth73"},
+        {GAP_LEE21, "Lee21"},
+        {GAP_TOKUDA92, "Tokuda92"},
         {GAP_MAX, NULL}
     };
     for(int j=0; aryTypeToName[j].gtn_name!=NULL; j++) {
@@ -216,7 +224,8 @@ void buildGaps()
         }
     }
     
-    // Extend the Ciura gaps by
+// This is old code to compute a gap sequence very similar to jlaw1.
+// It's from https://stackoverflow.com/questions/2539545/fastest-gap-sequence-for-shell-sort
 //    gaps = allGaps[GAP_CIURA_SQRT5];
 //    double sqrt5 = sqrt(5.0);
 //    bool bDoFive = true;
@@ -237,6 +246,29 @@ void buildGaps()
         gap--;
         gap /= 2;
         gaps[j] = gap;
+    }
+    gaps[NUM_GAPS-1] = -1;
+    
+    // Ying Wai Lee's sequence.  See EMPIRICALLY IMPROVED TOKUDA GAP SEQUENCE IN SHELLSORT
+    // https://arxiv.org/pdf/2112.11112.pdf
+    // 1, 4, 9, 20, 45, 102, 230, 516, 1158, 2599, 5831, 13082, 29351, 65853, 147748, 331490, 743735, ...
+    gaps = allGaps[GAP_LEE21];
+    const double leeMultiplier = 2.243609061420001;
+    for(j=0; j<NUM_GAPS-1; j++) {
+        gaps[j] = (int64_t)(ceil((pow(leeMultiplier, j+1) - 1.0) / (leeMultiplier - 1.0)));
+    }
+    gaps[NUM_GAPS-1] = -1;
+    
+    // Tokuda, 1992.
+    // 1, 4, 9, 20, 46, 103, 233, 525, 1182, 2660, 5985, 13467, 30301, 68178, 153401, 345152, 776591,
+    // 1747331, 3931496, 8845866, 19903198, 44782196, 100759940, 226709866, 510097200, 1147718700,
+    // 2582367076, 5810325920, 13073233321, 29414774973
+    gaps = allGaps[GAP_TOKUDA92];
+    gaps[0] = 1;
+    double hPrime = 1.0;
+    for(j=1; j<NUM_GAPS-1; j++) {
+        hPrime = 2.25*hPrime + 1.0;
+        gaps[j] = ceil(hPrime);
     }
     gaps[NUM_GAPS-1] = -1;
 }
