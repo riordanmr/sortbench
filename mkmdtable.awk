@@ -28,6 +28,6 @@ END {
         recsPerSec = fields[4]
         relPerf = recsPerSec / worstPerf
         aveDevPct = fields[6] * 100
-        print "| " gapName " | " recsPerSec " | " aveDevPct "% | " sprintf("%.3f",relPerf) " | "
+        print "| " gapName " | " recsPerSec " | " aveDevPct "% | " sprintf("%.4f",relPerf) " | "
     }
 }

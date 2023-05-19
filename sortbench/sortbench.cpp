@@ -28,7 +28,9 @@ typedef DataRecord *ArrayElementType;
 typedef uint64_t sb_timer_t;
 
 struct TypSettings {
-    int64_t maxRecs = 1000000;
+    int64_t arraySizeMin = 1000000;
+    int64_t arraySizeMult = 10;
+    int64_t arraySizeMax = 1000000;
     int64_t loopCt = 10;
     int64_t seed = 301;
     string  outputFile = "sortbench.csv";
@@ -40,14 +42,15 @@ void usage()
     const char *msg[] = {
         "sortbench: Program to benchmark sorting algorithms.",
         "Generates arrays of random and sorts them.",
-        "Usage: sortbench {-test | [-maxrecs:maxrecs] [-loopct:loopct]",
-        "  [-seed:seed] [-outfile:outfile] }",
+        "Usage: sortbench {-test | [-sizemin:sizemin] [-sizemult:sizemult]",
+        "  [-sizemax:sizemax] [-loopct:loopct] [-seed:seed] [-outfile:outfile] }",
         "Where:",
         "-test      causes the program to run various self-tests,",
         "           print the results of those tests, and exit.",
-        "maxrecs    is the maximum number of array entries to use.",
-        "           Various array sizes up to and including this size",
-        "           will be benchmarked. Default: 10000000.",
+        "sizemin, sizemult, sizemax control the number of array entries to use.",
+        "           The program loops, benchmarking with arrays of size sizemin",
+        "           then multiplying by sizemult until the number of array entries"
+        "           is greater than sizemax.  Defaults are 1000000, 10, 1000000.",
         "loopct     is the number of times each benchmark should be run,",
         "           typically with different data.  Default: 10.",
         "seed       is a signed 32-bit number that will be used as a seed",
@@ -102,8 +105,12 @@ bool parseCmdLine(int argc, const char * argv[], TypSettings &settings)
         if(parseArg(parg, name, val)) {
             if("test"==name) {
                 settings.bTest = true;
-            } else if("maxrecs"==name) {
-                settings.maxRecs = atol(val.c_str());
+            } else if("sizemin"==name) {
+                settings.arraySizeMin = atol(val.c_str());
+            } else if("sizemult"==name) {
+                settings.arraySizeMult = atol(val.c_str());
+            } else if("sizemax"==name) {
+                settings.arraySizeMax = atol(val.c_str());
             } else if("loopct"==name) {
                 settings.loopCt = atol((val.c_str()));
             } else if("seed"==name) {
@@ -433,10 +440,10 @@ void doSorts(TypSettings settings)
         string sortName = "ShellSort";
         sortName += nameOfGapType(gapType);
         int64_t *gaps = allGaps[gapType];
-        for(int64_t nOrig=10; nOrig<=settings.maxRecs; nOrig*=10) {
+        for(int64_t nOrig=settings.arraySizeMin; nOrig<=settings.arraySizeMax; nOrig*=settings.arraySizeMult) {
             for(int64_t add=0; add<2; add++) {
                 int64_t n = nOrig + add;
-                for(int loop=0; loop<settings.loopCt; loop++) {
+                for(int loop=0; loop<settings.loopCt/2; loop++) {
                     uint64_t seed = settings.seed + loop;
                     setRandomSeed(seed);
                     bool bOK = doOneSort(n, gaps, elapsedNs);
@@ -450,6 +457,8 @@ void doSorts(TypSettings settings)
         }
     }
 }
+
+//=====  Test functions  ==============================================
 
 void printArray(ArrayElementType * pArray, int64_t n)
 {
