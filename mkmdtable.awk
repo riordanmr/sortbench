@@ -20,6 +20,9 @@ BEGIN {
 END {
     print "| Gap sequence | Recs/sec | Ave dev | Rel Perf |"
     print "|---------------|----------|---------|---------|"
+    # Get the recs/sec of the slowest gap sequence; we'll use this to compute
+    # the relative performance of each gap sequence.  The slowest one will be
+    # last, because the input will be sorted.
     split(aryRecs[NR], fields)
     worstPerf = fields[4]
     for(j=1; j<=NR; j++) {
