@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		6ACEBE7F2A0194470021F051 /* sortbench.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6ACEBE7E2A0194470021F051 /* sortbench.cpp */; };
+		6AEF8C0B2A0827E600D2239C /* rangen.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF8C092A0827E600D2239C /* rangen.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +26,8 @@
 /* Begin PBXFileReference section */
 		6A9A2E882A0193A800D9EA89 /* sortbench */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = sortbench; sourceTree = BUILT_PRODUCTS_DIR; };
 		6ACEBE7E2A0194470021F051 /* sortbench.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = sortbench.cpp; sourceTree = "<group>"; };
+		6AEF8C092A0827E600D2239C /* rangen.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = rangen.cpp; sourceTree = "<group>"; };
+		6AEF8C0C2A08280E00D2239C /* rangen.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rangen.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,6 +60,8 @@
 		6A9A2E8A2A0193A800D9EA89 /* sortbench */ = {
 			isa = PBXGroup;
 			children = (
+				6AEF8C0C2A08280E00D2239C /* rangen.h */,
+				6AEF8C092A0827E600D2239C /* rangen.cpp */,
 				6ACEBE7E2A0194470021F051 /* sortbench.cpp */,
 			);
 			path = sortbench;
@@ -119,6 +124,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6AEF8C0B2A0827E600D2239C /* rangen.cpp in Sources */,
 				6ACEBE7F2A0194470021F051 /* sortbench.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

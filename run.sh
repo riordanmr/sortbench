@@ -1,7 +1,7 @@
 rm sortbench.csv.old2
 mv sortbench.csv.old1 sortbench.csv.old2
 mv sortbench.csv sortbench.csv.old1
-export BENCHARGS="-loopct:1000 -seed:9200 "
+export BENCHARGS="-loopct:1000 -seed:8804"
 echo $BENCHARGS
 time /Users/mrr/Library/Developer/Xcode/DerivedData/sortbench-ctcrgrohjviqkchcipkjtnucyeou/Build/Products/Release/sortbench $BENCHARGS
 echo $BENCHARGS

@@ -49,7 +49,7 @@ void usage()
         "           print the results of those tests, and exit.",
         "sizemin, sizemult, sizemax control the number of array entries to use.",
         "           The program loops, benchmarking with arrays of size sizemin",
-        "           then multiplying by sizemult until the number of array entries"
+        "           then multiplying by sizemult until the number of array entries",
         "           is greater than sizemax.  Defaults are 1000000, 10, 1000000.",
         "loopct     is the number of times each benchmark should be run,",
         "           typically with different data.  Default: 10.",
@@ -155,10 +155,11 @@ void writeLogRec(const char *sortName, int64_t nRecs, int64_t seed, int64_t elap
             bSortedOK ? "true":"false");
 }
 
-enum TypGap {GAP_CIURA_22, CAP_CIURA_225, CAP_CIURA_225_ODD, GAP_JDAW1, GAP_KNUTH73, GAP_LEE21,
+enum TypGap {GAP_CIURA_22, GAP_CIURA_225, GAP_CIURA_225_ODD, GAP_CIURA_235, GAP_JDAW1, GAP_KNUTH73, GAP_LEE21,
     GAP_TOKUDA92, GAP_MAX};
 const int NUM_GAPS = 36;
 int64_t allGaps[GAP_MAX][NUM_GAPS] = {
+    {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
     {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
     {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
     {1, 4, 10, 23, 57, 132, 301, 701, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1},
@@ -183,8 +184,9 @@ const char *nameOfGapType(TypGap gapType)
         const char *gtn_name;
     } aryTypeToName[] = {
         {GAP_CIURA_22, "Ciura22"},
-        {CAP_CIURA_225, "Ciura225"},
-        {CAP_CIURA_225_ODD, "Ciura225Odd"},
+        {GAP_CIURA_225, "Ciura225"},
+        {GAP_CIURA_235, "Ciura235"},
+        {GAP_CIURA_225_ODD, "Ciura225Odd"},
         {GAP_JDAW1, "Jdaw1"},
         {GAP_KNUTH73, "Knuth73"},
         {GAP_LEE21, "Lee21"},
@@ -215,16 +217,24 @@ void buildGaps()
     }
     
     // Minor variation: multiply previous gap by 2.25.
-    gaps = allGaps[CAP_CIURA_225];
+    gaps = allGaps[GAP_CIURA_225];
     for(j=0; gaps[j]>=0; j++) {
         if(gaps[j]==0) {
             gaps[j] = (uint64_t)(2.25*gaps[j-1]);
         }
     }
+
+    // Another minor variation: multiply previous gap by 2.35.
+    gaps = allGaps[GAP_CIURA_235];
+    for(j=0; gaps[j]>=0; j++) {
+        if(gaps[j]==0) {
+            gaps[j] = (uint64_t)(2.35*gaps[j-1]);
+        }
+    }
     
     // Another variation: multiply previous gap by 2.25 and if it isn't odd,
     // add 1 to make it odd.
-    gaps = allGaps[CAP_CIURA_225_ODD];
+    gaps = allGaps[GAP_CIURA_225_ODD];
     for(j=0; gaps[j]>=0; j++) {
         if(gaps[j]==0) {
             gaps[j] = 1 | (uint64_t)(2.25*gaps[j-1]);
